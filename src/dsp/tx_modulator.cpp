@@ -22,7 +22,7 @@
 #include <vector>
 #include <gnuradio/analog/frequency_modulator_fc.h>
 #include <gnuradio/analog/rail_ff.h>
-#include <gnuradio/blocks/add_const.h>
+#include <gnuradio/blocks/add_blk.h>
 #include <gnuradio/blocks/float_to_complex.h>
 #include <gnuradio/blocks/multiply_const.h>
 #include <gnuradio/filter/fir_filter_blk.h>
@@ -106,14 +106,18 @@ tx_modulator::tx_modulator(tx_mod_mode mode, float audio_rate, float max_dev,
         auto filt = gr::filter::fir_filter_fff::make(1, taps);
         auto clip = gr::analog::rail_ff::make(-1.0, 1.0);
         auto depth = gr::blocks::multiply_const_ff::make(am_depth);
-        auto carrier = gr::blocks::add_const_ff::make(1.0f);
+        /* rail_ff clamped to [1, 1] outputs a constant 1.0 (the carrier) */
+        auto one = gr::analog::rail_ff::make(1.0, 1.0);
+        auto carrier = gr::blocks::add_ff::make();
         auto level = gr::blocks::multiply_const_ff::make(TX_OUT_LEVEL / (1.0f + am_depth));
         auto to_c = gr::blocks::float_to_complex::make(1);
 
         connect(self(), 0, filt, 0);
         connect(filt, 0, clip, 0);
         connect(clip, 0, depth, 0);
+        connect(clip, 0, one, 0);
         connect(depth, 0, carrier, 0);
+        connect(one, 0, carrier, 1);
         connect(carrier, 0, level, 0);
         connect(level, 0, to_c, 0);
         connect(to_c, 0, self(), 0);
